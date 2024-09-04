@@ -1,300 +1,69 @@
-name: Documents Build
+name: MASVS Build
 
 on: [push, workflow_dispatch]
 
-env:
-  VERSION: "1.3"
-
 jobs:
-
-##
-## For langs that require the special fonts ( Russian, Chinese, etc.)
-## The `stable-full` version of pandocker is required, you can activate
-## it with the `TAG` environment variable, like this
-##
-## TAG=stable-full ./tools/docker/pandoc_makedocs.sh ....
-##
-
-  en:
+  Generate-MASVS-Documents:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 1
 
-    - name: Generate English PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document ${{env.VERSION}}
+    - name: Set MASVS_VERSION to env 
+      run: echo "MASVS_VERSION=$(curl -s https://api.github.com/repos/OWASP/owasp-masvs/tags | jq '.[0].name' | sed 's/\"//g')" >> $GITHUB_ENV
+
+    - name: Set DEV MASVS_VERSION if it's not a tag
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      run: echo "MASVS_VERSION=${{env.MASVS_VERSION}}-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+    - name: Get Latest MASTG Release Tag
+      run: echo "MASTG_VERSION=$(curl -s https://api.github.com/repos/OWASP/owasp-mastg/releases/latest | jq '.tag_name' | sed 's/\"//g')" >> $GITHUB_ENV
+
+
+
+    - name: Generate MASVS yaml
+      run: python3 ./tools/generate_masvs_yaml.py -v ${{ env.MASVS_VERSION }}
+
+    - name: Populate MASVS Categories Markdown Files
+      run: python3 ./tools/populate_masvs_categories_md.py
+
+    - name: Generate PDF and ePub
+      run: ./tools/docker/pandoc_makedocs.sh Document ${{ env.MASVS_VERSION }} ${{ env.MASTG_VERSION }}
+
+    - name: Generate CycloneDX JSON
+      run: python3 ./tools/generate_masvs_cyclonedx.py
+
+    - name: Generate SARIF
+      run: python3 ./tools/generate_masvs_sarif.py
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: OWASP_MASVS-${{env.VERSION}}-en
-        path: OWASP_MASVS-${{env.VERSION}}-en*
-
-  de:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate German PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document-de ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-de
-        path: OWASP_MASVS-${{env.VERSION}}-de*
-
-  fa:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Persian PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-fa ${{env.VERSION}}
-      env:
-        LATEX_TEMPLATE: default # there's a bug in the eisvogel template
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-fa
-        path: OWASP_MASVS-${{env.VERSION}}-fa*
-
-  es:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Spanish PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document-es ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-es
-        path: OWASP_MASVS-${{env.VERSION}}-es*
-
-  fr:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate French PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document-fr ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-fr 
-        path: OWASP_MASVS-${{env.VERSION}}-fr*
-
-  hi:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Hindi PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-hi ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-hi
-        path: OWASP_MASVS-${{env.VERSION}}-hi*
-
-  ja:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Japanese PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-ja ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-ja
-        path: OWASP_MASVS-${{env.VERSION}}-ja*
-
-  ko:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Korean PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-ko ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-ko
-        path: OWASP_MASVS-${{env.VERSION}}-ko*
-
-  pt-br:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Brazilian Portuguese PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document-ptbr ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-ptbr
-        path: OWASP_MASVS-${{env.VERSION}}-ptbr*
-
-
-  pt-pt:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Portugal Portuguese PDF
-      run: ./tools/docker/pandoc_makedocs.sh Document-ptpt ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-ptpt
-        path: OWASP_MASVS-${{env.VERSION}}-ptpt*
-
-
-  ru:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Russian PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-ru ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-ru
-        path: OWASP_MASVS-${{env.VERSION}}-ru*
-
-  zhcn:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Simplified Chinese PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-zhcn ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-zhcn
-        path: OWASP_MASVS-${{env.VERSION}}-zhcn*
-
-  zhtw:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Generate Traditional Chinese PDF
-      run: TAG=stable-full ./tools/docker/pandoc_makedocs.sh Document-zhtw ${{env.VERSION}}
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}-zhtw
-        path: OWASP_MASVS-${{env.VERSION}}-zhtw*
-
-
-  export:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Pull the Docker image
-      run: docker pull owasp/masvs-docgenerator:0.2
-    # only use below when testing new container builds
-    # - name: Build the Docker image
-    #   run: docker build ./tools/docker --tag masvs-generator:latest
-
-    - name: Generate python scripts (csv)
-      run: docker run -v ${PWD}:/documents owasp/masvs-docgenerator:0.2 'cd /documents/tools && python3 export.py --format csv --lang en > OWASP_MASVS-${{env.VERSION}}.csv'
-    - name: Generate python scripts (json)
-      run: docker run -v ${PWD}:/documents owasp/masvs-docgenerator:0.2 'cd /documents/tools && python3 export.py --format json --lang en > OWASP_MASVS-${{env.VERSION}}.json'
-    - name: Generate python scripts (xml)
-      run: docker run -v ${PWD}:/documents owasp/masvs-docgenerator:0.2 'cd /documents/tools && python3 export.py --format xml --lang en > OWASP_MASVS-${{env.VERSION}}.xml'
-    - name: Upload CSV export
-      uses: actions/upload-artifact@v1
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}.csv
-        path: tools/OWASP_MASVS-${{env.VERSION}}.csv
-    - name: Upload JSON export
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}.json
-        path: tools/OWASP_MASVS-${{env.VERSION}}.json
-    - name: Upload XML export
-      uses: actions/upload-artifact@v2
-      with:
-        name: OWASP_MASVS-${{env.VERSION}}.xml
-        path: tools/OWASP_MASVS-${{env.VERSION}}.xml
-
-    - name: Upload RECENT Changes
-      uses: actions/upload-artifact@v2
-      if: startsWith(github.ref, 'refs/tags/') && (github.actor == 'cpholguera' || github.actor == 'sushi2k')
-      with:
-        name: RECENT_CHANGES.md
-        path: tools/RECENT_CHANGES.md
+        name: OWASP_MASVS
+        path: OWASP_MASVS*
 
   release:
     runs-on: ubuntu-latest
-    needs: [en, de, fa, es, fr, hi, ja, ko, pt-br, pt-pt, ru, zhcn, zhtw, export]
+    needs: [Generate-MASVS-Documents]
     if: startsWith(github.ref, 'refs/tags/') && (github.actor == 'cpholguera' || github.actor == 'sushi2k')
     steps:
-      - uses: actions/download-artifact@v2
-      - name: List Downloaded Spanish Translation (sampling of download-artifact)
-        run: ls -l OWASP_MASVS-*-es
-      - name: Move all translations (pdf, epub and docx) to root
-        run: mv OWASP_MASVS-*-*/* .
-      - name: Listing of root directory
-        run: ls -l
-      # - name: Cleanup - Remove all downloaded documents
-      #   run: rm -rf OWASP_MASVS-*/
+      - uses: actions/download-artifact@v4
+      - name: Move all files to the root folder
+        run: mv OWASP_MASVS*/* .
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: RECENT_CHANGES.md/RECENT_CHANGES.md
+          prerelease: false
+          draft: true
+          generate_release_notes: true
+          discussion_category_name: Announcements
           files: |
-            OWASP_MASVS-*.pdf
-            OWASP_MASVS-*.epub
-            OWASP_MASVS-*.docx
-            OWASP_MASVS-*.csv/OWASP_MASVS-*.csv
-            OWASP_MASVS-*.json/OWASP_MASVS-*.json
-            OWASP_MASVS-*.xml/OWASP_MASVS-*.xml
+            OWASP_MASVS.pdf
+            OWASP_MASVS.epub
+            OWASP_MASVS.yaml
+            OWASP_MASVS.cdx.json
+            OWASP_MASVS.sarif
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
